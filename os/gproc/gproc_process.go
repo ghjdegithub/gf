@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -23,12 +24,11 @@ type Process struct {
 
 // NewProcess creates and returns a new Process.
 func NewProcess(path string, args []string, environment ...[]string) *Process {
-	var env []string
+	env := os.Environ()
 	if len(environment) > 0 {
-		env = make([]string, len(environment[0]))
-		copy(env, environment[0])
-	} else {
-		env = os.Environ()
+		for k, v := range environment[0] {
+			env[k] = v
+		}
 	}
 	process := &Process{
 		Manager: nil,
@@ -115,7 +115,9 @@ func (p *Process) Kill() error {
 		if p.Manager != nil {
 			p.Manager.processes.Remove(p.Pid())
 		}
-		p.Process.Release()
+		if runtime.GOOS != "windows" {
+			p.Process.Release()
+		}
 		p.Process.Wait()
 		return nil
 	} else {

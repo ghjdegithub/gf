@@ -24,7 +24,8 @@ import (
 // ZipPath compresses <paths> to <dest> using zip compressing algorithm.
 // The unnecessary parameter <prefix> indicates the path prefix for zip file.
 //
-// Note that parameter <paths> supports multiple paths join with ','.
+// Note that the parameter <paths> can be either a directory or a file, which
+// supports multiple paths join with ','.
 func ZipPath(paths, dest string, prefix ...string) error {
 	writer, err := os.Create(dest)
 	if err != nil {
@@ -37,7 +38,8 @@ func ZipPath(paths, dest string, prefix ...string) error {
 // ZipPathWriter compresses <paths> to <writer> using zip compressing algorithm.
 // The unnecessary parameter <prefix> indicates the path prefix for zip file.
 //
-// Note that parameter <paths> supports multiple paths join with ','.
+// Note that the parameter <paths> can be either a directory or a file, which
+// supports multiple paths join with ','.
 func ZipPathWriter(paths string, writer io.Writer, prefix ...string) error {
 	zipWriter := zip.NewWriter(writer)
 	defer zipWriter.Close()
@@ -51,24 +53,30 @@ func ZipPathWriter(paths string, writer io.Writer, prefix ...string) error {
 }
 
 func doZipPathWriter(path string, zipWriter *zip.Writer, prefix ...string) error {
+	var err error
+	var files []string
 	realPath, err := gfile.Search(path)
 	if err != nil {
 		return err
 	}
-	files, err := gfile.ScanDir(path, "*", true)
-	if err != nil {
-		return err
+	if gfile.IsDir(path) {
+		files, err = gfile.ScanDir(path, "*", true)
+		if err != nil {
+			return err
+		}
+	} else {
+		files = []string{path}
 	}
 	headerPrefix := ""
 	if len(prefix) > 0 && prefix[0] != "" {
 		headerPrefix = prefix[0]
 	}
 	headerPrefix = strings.TrimRight(headerPrefix, "\\/")
-	if gfile.IsDir(path) {
-		if len(headerPrefix) > 0 {
-			headerPrefix += "/"
-		}
-		headerPrefix = headerPrefix + gfile.Basename(path)
+	if len(headerPrefix) > 0 && gfile.IsDir(path) {
+		headerPrefix += "/"
+	}
+	if headerPrefix == "" {
+		headerPrefix = gfile.Basename(path)
 	}
 	headerPrefix = strings.Replace(headerPrefix, "//", "/", -1)
 	for _, file := range files {

@@ -38,34 +38,17 @@ golang version >= 1.10
 
 # Architecture
 <div align=center>
-<img src="https://goframe.org/images/arch.png?v=10"/>
+<img src="https://goframe.org/images/arch.png?v=11"/>
 </div>
-
-# Quick Start
-
-```go
-package main
-
-import (
-    "github.com/gogf/gf/frame/g"
-    "github.com/gogf/gf/net/ghttp"
-)
-
-func main() {
-    s := g.Server()
-    s.BindHandler("/", func(r *ghttp.Request) {
-        r.Response.Write("Hello World")
-    })
-    s.Run()
-}
-```
-
-[More Features...](https://goframe.org/start/index)
 
 
 # License
 
 `GF` is licensed under the [MIT License](LICENSE), 100% free and open-source, forever.
+
+# Contributors
+This project exists thanks to all the people who contribute. [[Contributors](https://github.com/gogf/gf/graphs/contributors)].
+<a href="https://github.com/gogf/gf/graphs/contributors"><img src="https://opencollective.com/goframe/contributors.svg?width=890&button=false" /></a>
 
 # Donators
 

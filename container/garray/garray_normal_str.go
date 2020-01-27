@@ -165,6 +165,9 @@ func (a *StrArray) InsertAfter(index int, value string) *StrArray {
 func (a *StrArray) Remove(index int) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if index < 0 || index >= len(a.array) {
+		return ""
+	}
 	// Determine array boundaries when deleting to improve deletion efficiency。
 	if index == 0 {
 		value := a.array[0]
@@ -181,6 +184,16 @@ func (a *StrArray) Remove(index int) string {
 	value := a.array[index]
 	a.array = append(a.array[:index], a.array[index+1:]...)
 	return value
+}
+
+// RemoveValue removes an item by value.
+// It returns true if value is found in the array, or else false if not found.
+func (a *StrArray) RemoveValue(value string) bool {
+	if i := a.Search(value); i != -1 {
+		a.Remove(i)
+		return true
+	}
+	return false
 }
 
 // PushLeft pushes one or multiple items to the beginning of array.
@@ -684,6 +697,22 @@ func (a *StrArray) UnmarshalJSON(b []byte) error {
 	defer a.mu.Unlock()
 	if err := json.Unmarshal(b, &a.array); err != nil {
 		return err
+	}
+	return nil
+}
+
+// UnmarshalValue is an interface implement which sets any type of value for array.
+func (a *StrArray) UnmarshalValue(value interface{}) error {
+	if a.mu == nil {
+		a.mu = rwmutex.New()
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch value.(type) {
+	case string, []byte:
+		return json.Unmarshal(gconv.Bytes(value), &a.array)
+	default:
+		a.array = gconv.SliceStr(value)
 	}
 	return nil
 }

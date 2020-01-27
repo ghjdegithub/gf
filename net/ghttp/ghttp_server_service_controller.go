@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/gogf/gf/os/gfile"
-	"github.com/gogf/gf/os/glog"
 	"github.com/gogf/gf/text/gregex"
 	"github.com/gogf/gf/text/gstr"
 )
@@ -53,14 +52,14 @@ func (s *Server) doBindController(pattern string, controller Controller, method 
 	// 当pattern中的method为all时，去掉该method，以便于后续方法判断
 	domain, method, path, err := s.parsePattern(pattern)
 	if err != nil {
-		glog.Fatal(err)
+		s.Logger().Fatal(err)
 		return
 	}
 	if strings.EqualFold(method, gDEFAULT_METHOD) {
 		pattern = s.serveHandlerKey("", path, domain)
 	}
 	// 遍历控制器，获取方法列表，并构造成uri
-	m := make(handlerMap)
+	m := make(map[string]*handlerItem)
 	v := reflect.ValueOf(controller)
 	t := v.Type()
 	pkgPath := t.Elem().PkgPath()
@@ -81,11 +80,11 @@ func (s *Server) doBindController(pattern string, controller Controller, method 
 		if _, ok := v.Method(i).Interface().(func()); !ok {
 			if len(methodMap) > 0 {
 				// 指定的方法名称注册，那么需要使用错误提示
-				glog.Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
+				s.Logger().Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
 					pkgPath, ctlName, methodName, v.Method(i).Type().String())
 			} else {
 				// 否则只是Debug提示
-				glog.Debugf(`ignore route method: %s.%s.%s defined as "%s", no match "func()"`,
+				s.Logger().Debugf(`ignore route method: %s.%s.%s defined as "%s", no match "func()"`,
 					pkgPath, ctlName, methodName, v.Method(i).Type().String())
 			}
 			continue
@@ -125,14 +124,14 @@ func (s *Server) doBindController(pattern string, controller Controller, method 
 }
 
 func (s *Server) doBindControllerMethod(pattern string, controller Controller, method string, middleware []HandlerFunc) {
-	m := make(handlerMap)
+	m := make(map[string]*handlerItem)
 	v := reflect.ValueOf(controller)
 	t := v.Type()
 	structName := t.Elem().Name()
 	methodName := strings.TrimSpace(method)
 	methodValue := v.MethodByName(methodName)
 	if !methodValue.IsValid() {
-		glog.Fatal("invalid method name: " + methodName)
+		s.Logger().Fatal("invalid method name: " + methodName)
 		return
 	}
 	pkgPath := t.Elem().PkgPath()
@@ -142,7 +141,7 @@ func (s *Server) doBindControllerMethod(pattern string, controller Controller, m
 		ctlName = fmt.Sprintf(`(%s)`, ctlName)
 	}
 	if _, ok := methodValue.Interface().(func()); !ok {
-		glog.Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
+		s.Logger().Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
 			pkgPath, ctlName, methodName, methodValue.Type().String())
 		return
 	}
@@ -161,7 +160,7 @@ func (s *Server) doBindControllerMethod(pattern string, controller Controller, m
 
 func (s *Server) doBindControllerRest(pattern string, controller Controller, middleware []HandlerFunc) {
 	// 遍历控制器，获取方法列表，并构造成uri
-	m := make(handlerMap)
+	m := make(map[string]*handlerItem)
 	v := reflect.ValueOf(controller)
 	t := v.Type()
 	pkgPath := t.Elem().PkgPath()
@@ -178,7 +177,7 @@ func (s *Server) doBindControllerRest(pattern string, controller Controller, mid
 			ctlName = fmt.Sprintf(`(%s)`, ctlName)
 		}
 		if _, ok := v.Method(i).Interface().(func()); !ok {
-			glog.Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
+			s.Logger().Errorf(`invalid route method: %s.%s.%s defined as "%s", but "func()" is required for controller registry`,
 				pkgPath, ctlName, methodName, v.Method(i).Type().String())
 			return
 		}

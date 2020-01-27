@@ -24,6 +24,7 @@ import (
 type Model struct {
 	db            DB             // Underlying DB interface.
 	tx            *TX            // Underlying TX interface.
+	schema        string         // Custom database schema.
 	linkType      int            // Mark for operation on master or slave.
 	tablesInit    string         // Table names when model initialization.
 	tables        string         // Operation table names, which can be more than one table names and aliases, like: "user", "user u", "user u, user_detail ud".
@@ -63,7 +64,7 @@ const (
 	OPTION_ALLOWEMPTY
 )
 
-// Table creates and returns a new ORM model.
+// Table creates and returns a new ORM model from given schema.
 // The parameter <tables> can be more than one table names, like :
 // "user", "user u", "user, user_detail", "user u, user_detail ud"
 func (bs *dbBase) Table(table string) *Model {
@@ -82,15 +83,15 @@ func (bs *dbBase) Table(table string) *Model {
 
 // Model is alias of dbBase.Table.
 // See dbBase.Table.
-func (bs *dbBase) Model(tables string) *Model {
-	return bs.db.Table(tables)
+func (bs *dbBase) Model(table string) *Model {
+	return bs.db.Table(table)
 }
 
 // From is alias of dbBase.Table.
 // See dbBase.Table.
 // Deprecated.
-func (bs *dbBase) From(tables string) *Model {
-	return bs.db.Table(tables)
+func (bs *dbBase) From(table string) *Model {
+	return bs.db.Table(table)
 }
 
 // Table acts like dbBase.Table except it operates on transaction.
@@ -112,15 +113,25 @@ func (tx *TX) Table(table string) *Model {
 
 // Model is alias of tx.Table.
 // See tx.Table.
-func (tx *TX) Model(tables string) *Model {
-	return tx.Table(tables)
+func (tx *TX) Model(table string) *Model {
+	return tx.Table(table)
 }
 
 // From is alias of tx.Table.
 // See tx.Table.
 // Deprecated.
-func (tx *TX) From(tables string) *Model {
-	return tx.Table(tables)
+func (tx *TX) From(table string) *Model {
+	return tx.Table(table)
+}
+
+// As sets an alias name for current table.
+func (m *Model) As(as string) *Model {
+	if m.tables != "" {
+		model := m.getModel()
+		model.tables = gstr.TrimRight(model.tables) + " AS " + as
+		return model
+	}
+	return m
 }
 
 // DB sets/changes the db object for current operation.
@@ -134,6 +145,13 @@ func (m *Model) DB(db DB) *Model {
 func (m *Model) TX(tx *TX) *Model {
 	model := m.getModel()
 	model.tx = tx
+	return model
+}
+
+// Schema sets the schema for current operation.
+func (m *Model) Schema(schema string) *Model {
+	model := m.getModel()
+	model.schema = schema
 	return model
 }
 
@@ -391,6 +409,9 @@ func (m *Model) Offset(offset int) *Model {
 // Note that, it differs that the Limit function start from 0 for "LIMIT" statement.
 func (m *Model) Page(page, limit int) *Model {
 	model := m.getModel()
+	if page <= 0 {
+		page = 1
+	}
 	model.start = (page - 1) * limit
 	model.limit = limit
 	return model
@@ -507,7 +528,7 @@ func (m *Model) Insert(data ...interface{}) (result sql.Result, err error) {
 			batch = m.batch
 		}
 		return m.db.doBatchInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(list),
 			gINSERT_OPTION_DEFAULT,
@@ -516,7 +537,7 @@ func (m *Model) Insert(data ...interface{}) (result sql.Result, err error) {
 	} else if data, ok := m.data.(Map); ok {
 		// Single insert.
 		return m.db.doInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(data),
 			gINSERT_OPTION_DEFAULT,
@@ -547,7 +568,7 @@ func (m *Model) Replace(data ...interface{}) (result sql.Result, err error) {
 			batch = m.batch
 		}
 		return m.db.doBatchInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(list),
 			gINSERT_OPTION_REPLACE,
@@ -556,7 +577,7 @@ func (m *Model) Replace(data ...interface{}) (result sql.Result, err error) {
 	} else if data, ok := m.data.(Map); ok {
 		// Single insert.
 		return m.db.doInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(data),
 			gINSERT_OPTION_REPLACE,
@@ -590,7 +611,7 @@ func (m *Model) Save(data ...interface{}) (result sql.Result, err error) {
 			batch = m.batch
 		}
 		return m.db.doBatchInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(list),
 			gINSERT_OPTION_SAVE,
@@ -599,7 +620,7 @@ func (m *Model) Save(data ...interface{}) (result sql.Result, err error) {
 	} else if data, ok := m.data.(Map); ok {
 		// Single save.
 		return m.db.doInsert(
-			m.getLink(),
+			m.getLink(true),
 			m.tables,
 			m.filterDataForInsertOrUpdate(data),
 			gINSERT_OPTION_SAVE,
@@ -633,7 +654,7 @@ func (m *Model) Update(dataAndWhere ...interface{}) (result sql.Result, err erro
 	}
 	condition, conditionArgs := m.formatCondition(false)
 	return m.db.doUpdate(
-		m.getLink(),
+		m.getLink(true),
 		m.tables,
 		m.filterDataForInsertOrUpdate(m.data),
 		condition,
@@ -654,7 +675,7 @@ func (m *Model) Delete(where ...interface{}) (result sql.Result, err error) {
 		}
 	}()
 	condition, conditionArgs := m.formatCondition(false)
-	return m.db.doDelete(m.getLink(), m.tables, condition, conditionArgs...)
+	return m.db.doDelete(m.getLink(true), m.tables, condition, conditionArgs...)
 }
 
 // Select is alias of Model.All.
@@ -823,16 +844,12 @@ func (m *Model) Count(where ...interface{}) (int, error) {
 	if len(where) > 0 {
 		return m.Where(where[0], where[1:]...).Count()
 	}
-	defer func(fields string) {
-		m.fields = fields
-	}(m.fields)
-	if m.fields == "" || m.fields == "*" {
-		m.fields = "COUNT(1)"
-	} else {
-		m.fields = fmt.Sprintf(`COUNT(%s)`, m.fields)
+	countFields := "COUNT(1)"
+	if m.fields != "" && m.fields != "*" {
+		countFields = fmt.Sprintf(`COUNT(%s)`, m.fields)
 	}
 	condition, conditionArgs := m.formatCondition(false)
-	s := fmt.Sprintf("SELECT %s FROM %s %s", m.fields, m.tables, condition)
+	s := fmt.Sprintf("SELECT %s FROM %s %s", countFields, m.tables, condition)
 	if len(m.groupBy) > 0 {
 		s = fmt.Sprintf("SELECT COUNT(1) FROM (%s) count_alias", s)
 	}
@@ -941,7 +958,7 @@ func (m *Model) filterDataForInsertOrUpdate(data interface{}) interface{} {
 // Note that, it does not filter list item, which is also type of map, for "omit empty" feature.
 func (m *Model) doFilterDataMapForInsertOrUpdate(data Map, allowOmitEmpty bool) Map {
 	if m.filter {
-		data = m.db.filterFields(m.tables, data)
+		data = m.db.filterFields(m.schema, m.tables, data)
 	}
 	// Remove key-value pairs of which the value is empty.
 	if allowOmitEmpty && m.option&OPTION_OMITEMPTY > 0 {
@@ -968,16 +985,25 @@ func (m *Model) doFilterDataMapForInsertOrUpdate(data Map, allowOmitEmpty bool) 
 }
 
 // getLink returns the underlying database link object with configured <linkType> attribute.
-func (m *Model) getLink() dbLink {
+// The parameter <master> specifies whether using the master node if master-slave configured.
+func (m *Model) getLink(master bool) dbLink {
 	if m.tx != nil {
 		return m.tx.tx
 	}
-	switch m.linkType {
+	linkType := m.linkType
+	if linkType == 0 {
+		if master {
+			linkType = gLINK_TYPE_MASTER
+		} else {
+			linkType = gLINK_TYPE_SLAVE
+		}
+	}
+	switch linkType {
 	case gLINK_TYPE_MASTER:
-		link, _ := m.db.Master()
+		link, _ := m.db.getMaster(m.schema)
 		return link
 	case gLINK_TYPE_SLAVE:
-		link, _ := m.db.Slave()
+		link, _ := m.db.getSlave(m.schema)
 		return link
 	}
 	return nil
@@ -996,7 +1022,7 @@ func (m *Model) getAll(query string, args ...interface{}) (result Result, err er
 			return v.(Result), nil
 		}
 	}
-	result, err = m.db.doGetAll(m.getLink(), query, args...)
+	result, err = m.db.doGetAll(m.getLink(false), query, args...)
 	// Cache the result.
 	if len(cacheKey) > 0 && err == nil {
 		if m.cacheDuration < 0 {

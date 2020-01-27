@@ -40,7 +40,7 @@ golang版本 >= 1.11
 
 # 架构
 <div align=center>
-<img src="https://goframe.org/images/arch.png?v=10"/>
+<img src="https://goframe.org/images/arch.png?v=11"/>
 </div>
 
 
@@ -51,30 +51,15 @@ golang版本 >= 1.11
 
 接口文档：[https://godoc.org/github.com/gogf/gf](https://godoc.org/github.com/gogf/gf)
 
-# 使用
-```go
-package main
-
-import (
-    "github.com/gogf/gf/frame/g"
-    "github.com/gogf/gf/net/ghttp"
-)
-
-func main() {
-    s := g.Server()
-    s.BindHandler("/", func(r *ghttp.Request) {
-        r.Response.Write("Hello World")
-    })
-    s.Run()
-}
-```
-
-[更多..](https://goframe.org/start/index)
-
-
 # 协议
 
 `GF` 使用非常友好的 [MIT](LICENSE) 开源协议进行发布，永久`100%`开源免费。
+
+# 贡献
+
+感谢所有参与`GoFrame`开发的贡献者。 [[贡献者列表](https://github.com/gogf/gf/graphs/contributors)].
+<a href="https://github.com/gogf/gf/graphs/contributors"><img src="https://opencollective.com/goframe/contributors.svg?width=890&button=false" /></a>
+
 
 # 捐赠
 

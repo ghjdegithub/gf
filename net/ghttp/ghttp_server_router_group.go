@@ -12,7 +12,6 @@ import (
 
 	"github.com/gogf/gf/text/gstr"
 
-	"github.com/gogf/gf/os/glog"
 	"github.com/gogf/gf/util/gconv"
 )
 
@@ -46,6 +45,9 @@ var (
 
 // handlePreBindItems is called when server starts, which does really route registering to the server.
 func (s *Server) handlePreBindItems() {
+	if len(preBindItems) == 0 {
+		return
+	}
 	for _, item := range preBindItems {
 		// Handle the items of current server.
 		if item.group.server != nil && item.group.server != s {
@@ -56,6 +58,7 @@ func (s *Server) handlePreBindItems() {
 		}
 		item.group.doBind(item.bindType, item.pattern, item.object, item.params...)
 	}
+	preBindItems = preBindItems[:0]
 }
 
 // Group creates and returns a RouterGroup object.
@@ -139,7 +142,7 @@ func (g *RouterGroup) Bind(items []GroupItem) *RouterGroup {
 	group := g.Clone()
 	for _, item := range items {
 		if len(item) < 3 {
-			glog.Fatalf("invalid router item: %s", item)
+			g.server.Logger().Fatalf("invalid router item: %s", item)
 		}
 		bindType := gstr.ToUpper(gconv.String(item[0]))
 		switch bindType {
@@ -259,7 +262,7 @@ func (g *RouterGroup) doBind(bindType string, pattern string, object interface{}
 	if len(prefix) > 0 {
 		domain, method, path, err := g.server.parsePattern(pattern)
 		if err != nil {
-			glog.Fatalf("invalid pattern: %s", pattern)
+			g.server.Logger().Fatalf("invalid pattern: %s", pattern)
 		}
 		// If there'a already a domain, unset the domain field in the pattern.
 		if g.domain != nil {
@@ -338,7 +341,7 @@ func (g *RouterGroup) doBind(bindType string, pattern string, object interface{}
 				g.domain.BindHookHandler(pattern, extras[0], h)
 			}
 		} else {
-			glog.Fatalf("invalid hook handler for pattern:%s", pattern)
+			g.server.Logger().Fatalf("invalid hook handler for pattern:%s", pattern)
 		}
 	}
 	return g

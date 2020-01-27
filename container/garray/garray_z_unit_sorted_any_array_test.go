@@ -117,6 +117,9 @@ func TestSortedArray_Remove(t *testing.T) {
 		gtest.Assert(array1.Len(), 3)
 		gtest.Assert(array1.Contains("b"), false)
 
+		gtest.Assert(array1.Remove(-1), nil)
+		gtest.Assert(array1.Remove(100000), nil)
+
 		i2 := array1.Remove(0)
 		gtest.Assert(gconv.String(i2), "a")
 		gtest.Assert(array1.Len(), 2)
@@ -632,5 +635,46 @@ func TestSortedArray_Iterator(t *testing.T) {
 			return false
 		})
 		gtest.Assert(index, 1)
+	})
+}
+
+func TestSortedArray_RemoveValue(t *testing.T) {
+	slice := g.Slice{"a", "b", "d", "c"}
+	array := garray.NewSortedArrayFrom(slice, gutil.ComparatorString)
+	gtest.Case(t, func() {
+		gtest.Assert(array.RemoveValue("e"), false)
+		gtest.Assert(array.RemoveValue("b"), true)
+		gtest.Assert(array.RemoveValue("a"), true)
+		gtest.Assert(array.RemoveValue("c"), true)
+		gtest.Assert(array.RemoveValue("f"), false)
+	})
+}
+
+func TestSortedArray_UnmarshalValue(t *testing.T) {
+	type T struct {
+		Name  string
+		Array *garray.SortedArray
+	}
+	// JSON
+	gtest.Case(t, func() {
+		var t *T
+		err := gconv.Struct(g.Map{
+			"name":  "john",
+			"array": []byte(`[2,3,1]`),
+		}, &t)
+		gtest.Assert(err, nil)
+		gtest.Assert(t.Name, "john")
+		gtest.Assert(t.Array.Slice(), g.Slice{1, 2, 3})
+	})
+	// Map
+	gtest.Case(t, func() {
+		var t *T
+		err := gconv.Struct(g.Map{
+			"name":  "john",
+			"array": g.Slice{2, 3, 1},
+		}, &t)
+		gtest.Assert(err, nil)
+		gtest.Assert(t.Name, "john")
+		gtest.Assert(t.Array.Slice(), g.Slice{1, 2, 3})
 	})
 }

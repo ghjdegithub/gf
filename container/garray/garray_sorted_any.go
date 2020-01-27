@@ -160,6 +160,9 @@ func (a *SortedArray) Get(index int) interface{} {
 func (a *SortedArray) Remove(index int) interface{} {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if index < 0 || index >= len(a.array) {
+		return nil
+	}
 	// Determine array boundaries when deleting to improve deletion efficiency.
 	if index == 0 {
 		value := a.array[0]
@@ -176,6 +179,16 @@ func (a *SortedArray) Remove(index int) interface{} {
 	value := a.array[index]
 	a.array = append(a.array[:index], a.array[index+1:]...)
 	return value
+}
+
+// RemoveValue removes an item by value.
+// It returns true if value is found in the array, or else false if not found.
+func (a *SortedArray) RemoveValue(value interface{}) bool {
+	if i := a.Search(value); i != -1 {
+		a.Remove(i)
+		return true
+	}
+	return false
 }
 
 // PopLeft pops and returns an item from the beginning of array.
@@ -642,10 +655,34 @@ func (a *SortedArray) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &a.array); err != nil {
 		return err
 	}
-	if a.comparator != nil {
+	if a.comparator != nil && a.array != nil {
 		sort.Slice(a.array, func(i, j int) bool {
 			return a.comparator(a.array[i], a.array[j]) < 0
 		})
 	}
 	return nil
+}
+
+// UnmarshalValue is an interface implement which sets any type of value for array.
+func (a *SortedArray) UnmarshalValue(value interface{}) (err error) {
+	if a.mu == nil {
+		a.mu = rwmutex.New()
+		a.unique = gtype.NewBool()
+		// Note that the comparator is string comparator in default.
+		a.comparator = gutil.ComparatorString
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch value.(type) {
+	case string, []byte:
+		err = json.Unmarshal(gconv.Bytes(value), &a.array)
+	default:
+		a.array = gconv.SliceAny(value)
+	}
+	if a.comparator != nil && a.array != nil {
+		sort.Slice(a.array, func(i, j int) bool {
+			return a.comparator(a.array[i], a.array[j]) < 0
+		})
+	}
+	return err
 }
